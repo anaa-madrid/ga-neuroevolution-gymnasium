@@ -4,88 +4,88 @@
 # Neuroevolution for LunarLander-v2 using SALGA
 # Chromosomes encode the weights and biases of a perceptron controller
 
-import gymnasium as gym
 import numpy as np
-
-
-# =========================================================
-# Neural model (phenotype)
-# =========================================================
+import gymnasium as gym
 
 class Perceptron:
     def __init__(self, ninput, noutput):
         self.ninput = ninput
         self.noutput = noutput
-        self.w = np.zeros((ninput, noutput))
-        self.b = np.zeros(noutput)
-
-    def forward(self, x):
-        u = np.dot(x, self.w) + self.b
-        return np.piecewise(u, [u < 0, u >= 0], [0, 1])
+        self.w = np.random.rand(ninput,noutput)-0.5
+        self.b = np.random.rand(noutput)-0.5
+        
+    def forward (self, x): # propaga un vector x y devuelve la salida
+        u = np.dot(x, self.w) + self.b              
+        return np.piecewise(u, [u<0, u>=0], [0,1])
+                   
+        
+    def update (self, x, d, alpha): # realiza una iteración de entrenamiento
+        s = self.forward(x) # propaga
+        # Calcula la actualización de los pesos y el sesgo
+        error = d - s
+        self.w += alpha * np.outer(x,error)
+        self.b += error*alpha
+        
+               
+    def RMS (self, X, D): # calcula el error RMS
+        S = self.forward(X)
+        return np.mean(np.sqrt(np.mean(np.square(S-D),axis=1)))
+        
+    def accuracy (self, X, D): # calcula el ratio de aciertos
+        S = self.forward(X)
+        errors = np.mean(np.abs(D-S))
+        return 1.0 - errors
+    
+    def info (self, X, D): # traza de cómno va el entrenamiento
+        print('     RMS: %6.5f' % self.RMS(X,D))
+        print('Accuracy: %6.5f' % self.accuracy(X,D))
+        
+    def train (self, X, D, alpha, epochs, trace=0): # entrena usando update
+        for e in range(1,epochs+1):
+            for i in range(len(X)):
+                self.update(X[i],D[i], alpha)
+            if trace!=0 and e%trace == 0:
+                print('\n   Epoch: %d' % e)
+                self.info(X,D)
 
     def from_chromosome(self, chromosome):
+    # Extraer los pesos y bias de la lista del cromosoma
         w_size = self.ninput * self.noutput
-        self.w = np.array(chromosome[:w_size]).reshape(self.ninput, self.noutput)
-        self.b = np.array(chromosome[w_size:w_size + self.noutput])
+        w = np.array(chromosome[:w_size]).reshape(self.ninput, self.noutput)
+        b = np.array(chromosome[w_size:w_size+self.noutput])
+
+        # Actualizar los pesos y bias de la red
+        self.w = w
+        self.b = b
 
 
-# =========================================================
-# Policy
-# =========================================================
-
-def policy(observation, model):
-    s = model.forward(observation)
-    return np.argmax(s)
-
-
-# =========================================================
-# Fitness function (used by SALGA)
-# =========================================================
-
+env = gym.make("LunarLander-v3")
 def fitness(chromosome):
-    """
-    Given a chromosome, evaluates its fitness by running
-    one episode of LunarLander-v2.
-    """
+    # Crear modelo a partir del cromosoma
+    model=Perceptron(8,4)
+    model.from_chromosome(chromosome)    
+    
+    lista=0
+    for i in range(5):
+        observation, info = env.reset()
+        ite = 0
+        racum = 0
+        while True:
+            action = np.argmax(model.forward(observation))
+            observation, reward, terminated, truncated, info = env.step(action)
+            
+            
+            racum += reward
+            
+        
 
-    env = gym.make("LunarLander-v2")
-    observation, _ = env.reset()
+            if terminated or truncated:
+                break
+        racum=(racum+500)/800
+        lista+=racum       
+    
+    return lista/5
 
-    model = Perceptron(8, 4)
-    model.from_chromosome(chromosome)
+parameters={'alphabet':[-3,3], 'type':'floating', 'elitism':True, 'norm':True, 'chromsize':36, 'trace':1,'target':350}
 
-    total_reward = 0.0
-
-    while True:
-        action = policy(observation, model)
-        observation, reward, terminated, truncated, _ = env.step(action)
-        total_reward += reward
-
-        if terminated or truncated:
-            break
-
-    env.close()
-    return total_reward
-
-
-# =========================================================
-# Chromosome definition
-# =========================================================
-
-N_INPUTS = 8
-N_OUTPUTS = 4
-CHROMOSOME_LENGTH = N_INPUTS * N_OUTPUTS + N_OUTPUTS   # 36 genes
-
-
-# =========================================================
-# SALGA parameters
-# =========================================================
-
-parameters = {
-    'type': 'real',                     # real-valued chromosome
-    'length': CHROMOSOME_LENGTH,        # number of genes
-    'target': 200,                      # target fitness
-    'elitism': True,
-    'pmut': 1.0 / CHROMOSOME_LENGTH
-}
 
