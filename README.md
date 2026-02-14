@@ -44,7 +44,7 @@ The best chromosome found by SALGA is later loaded into the model and visualized
 
 ##  Notebook
 
-### [`Neuroevolution-LunarLander.ipynb]`
+### `Neuroevolution-LunarLander.ipynb`
 
 The notebook contains:
 - Environment exploration and manual control
